@@ -35324,8 +35324,9 @@ async function checkURLWithRetry(
       ...config
     })
     let passing = true
-    const hasCORSHeader = response.headers['access-control-allow-origin'] !== '*'
+    const hasCORSHeader = response.headers['access-control-allow-origin'] === '*'
 
+    // status code
     core.info(`Target ${url} returned a status code: ${response.status}.`)
 
     if (passing && searchString) {
@@ -35346,7 +35347,7 @@ async function checkURLWithRetry(
       core.info(`Target ${url} did not contain the undesired string "${searchNotString}".`)
     }
 
-    if (passing && hasCORSHeader) {
+    if (passing && !hasCORSHeader) {
       // check CORS
       core.error(`Target ${url} does not have CORS enabled.`)
       passing = false
@@ -35354,7 +35355,7 @@ async function checkURLWithRetry(
 
     if (passing) {
       core.info(
-        `Succeeded after ${retryCount + 1} tries (${retryCount} retries), waited ${cumulativeDelay}ms in total.`
+        `Target ${url} has CORS enabled after ${retryCount + 1} tries (${retryCount} retries), waited ${cumulativeDelay}ms in total.`
       )
       return true
     }
