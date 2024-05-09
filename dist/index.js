@@ -35280,20 +35280,20 @@ axios.default = axios;
 // this module should only have a default export
 /* harmony default export */ const lib_axios = (axios);
 
-;// CONCATENATED MODULE: ./curl.js
+;// CONCATENATED MODULE: ./check.js
 
 
 
 async function checkURLWithRetry(
   url,
-  searchString,
-  searchNotString,
+  requestMethod,
   retries,
   retryDelay,
-  basicAuthString,
   followRedirect,
-  retryAll,
   cookie,
+  basicAuthString,
+  searchString,
+  searchNotString,
   useExponentialBackoff
 ) {
   let retryCount = 0
@@ -35318,38 +35318,45 @@ async function checkURLWithRetry(
   }
 
   async function makeRequest() {
-    const response = await lib_axios.get(url, config)
+    const response = await lib_axios({
+      method: requestMethod,
+      url,
+      ...config
+    })
     let passing = true
+    const hasCORSHeader = response.headers['access-control-allow-origin'] !== '*'
 
-    if (response.status === 200) {
-      core.info(`Target ${url} returned a success status code.`)
+    core.info(`Target ${url} returned a status code: ${response.status}.`)
 
-      if (passing && searchString) {
-        if (!(typeof response.data === 'string' && response.data.includes(searchString))) {
-          core.error(`Target ${url} did not contain the desired string "${searchString}".`)
-          passing = false
-        }
-
-        core.info(`Target ${url} did contain the desired string "${searchString}".`)
+    if (passing && searchString) {
+      if (!(typeof response.data === 'string' && response.data.includes(searchString))) {
+        core.error(`Target ${url} did not contain the desired string "${searchString}".`)
+        passing = false
       }
 
-      if (passing && searchNotString) {
-        if (response.data.includes(searchNotString)) {
-          core.error(`Target ${url} did contain the undesired string "${searchNotString}".`)
-          passing = false
-        }
+      core.info(`Target ${url} did contain the desired string "${searchString}".`)
+    }
 
-        core.info(`Target ${url} did not contain the undesired string "${searchNotString}".`)
+    if (passing && searchNotString) {
+      if (response.data.includes(searchNotString)) {
+        core.error(`Target ${url} did contain the undesired string "${searchNotString}".`)
+        passing = false
       }
 
-      if (passing) {
-        core.info(
-          `Succeeded after ${retryCount + 1} tries (${retryCount} retries), waited ${cumulativeDelay}ms in total.`
-        )
-        return true
-      }
-    } else {
-      core.error(`Target ${url} returned a non-200 status code: ${response.status}`)
+      core.info(`Target ${url} did not contain the undesired string "${searchNotString}".`)
+    }
+
+    if (passing && hasCORSHeader) {
+      // check CORS
+      core.error(`Target ${url} does not have CORS enabled.`)
+      passing = false
+    }
+
+    if (passing) {
+      core.info(
+        `Succeeded after ${retryCount + 1} tries (${retryCount} retries), waited ${cumulativeDelay}ms in total.`
+      )
+      return true
     }
 
     if (retryCount < retries) {
@@ -35381,18 +35388,20 @@ process.on('unhandledRejection', (reason) => {
   }
 })
 
-async function run() {
-  const urlString = core.getInput('url', { required: true })
-  const maxAttemptsString = core.getInput('max-attempts')
-  const retryDelayString = core.getInput('retry-delay')
-  const followRedirect = core.getBooleanInput('follow-redirect')
-  const useExponentialBackoff = core.getBooleanInput('exponential-backoff')
-  const retryAll = core.getBooleanInput('retry-all')
-  const cookie = core.getInput('cookie')
-  const basicAuthString = core.getInput('basic-auth')
-  const searchString = core.getInput('contains')
-  const searchNotString = core.getInput('contains-not')
+// Mostly intended to test the action. When true, this reports success as failure and vice versa.
+const urlString = core.getInput('url', { required: true })
+const requestMethod = core.getInput('method')
+const expectFailure = core.getBooleanInput('expect-failure')
+const maxAttemptsString = core.getInput('max-attempts')
+const retryDelayString = core.getInput('retry-delay')
+const followRedirect = core.getBooleanInput('follow-redirect')
+const cookie = core.getInput('cookie')
+const basicAuthString = core.getInput('basic-auth')
+const searchString = core.getInput('contains')
+const searchNotString = core.getInput('contains-not')
+const useExponentialBackoff = core.getBooleanInput('exponential-backoff')
 
+async function run() {
   const urls = urlString.split('|')
   const retryDelayMs = duration_default().parse(retryDelayString).milliseconds()
   const maxAttempts = parseInt(maxAttemptsString) - 1
@@ -35402,26 +35411,23 @@ async function run() {
     // wait for all of them anyway
     await checkURLWithRetry(
       url,
-      searchString,
-      searchNotString,
+      requestMethod,
       maxAttempts,
       retryDelayMs,
-      basicAuthString,
       followRedirect,
-      retryAll,
       cookie,
+      basicAuthString,
+      searchString,
+      searchNotString,
       useExponentialBackoff
     )
   }
 
   // If we reach this without running into an error
-  core.info('All URL checks succeeded.')
+  core.info('All URL CORS checks succeeded.')
 }
 
 run().catch((e) => {
-  // Mostly intended to test the action. When true, this reports success as failure and vice versa.
-  let expectFailure = core.getBooleanInput('expect-failure')
-
   if (expectFailure) {
     core.info('The check failed as expected.')
   } else {

@@ -3,14 +3,14 @@ import * as core from '@actions/core'
 
 export async function checkURLWithRetry(
   url,
-  searchString,
-  searchNotString,
+  requestMethod,
   retries,
   retryDelay,
-  basicAuthString,
   followRedirect,
-  retryAll,
   cookie,
+  basicAuthString,
+  searchString,
+  searchNotString,
   useExponentialBackoff
 ) {
   let retryCount = 0
@@ -35,38 +35,45 @@ export async function checkURLWithRetry(
   }
 
   async function makeRequest() {
-    const response = await axios.get(url, config)
+    const response = await axios({
+      method: requestMethod,
+      url,
+      ...config
+    })
     let passing = true
+    const hasCORSHeader = response.headers['access-control-allow-origin'] !== '*'
 
-    if (response.status === 200) {
-      core.info(`Target ${url} returned a success status code.`)
+    core.info(`Target ${url} returned a status code: ${response.status}.`)
 
-      if (passing && searchString) {
-        if (!(typeof response.data === 'string' && response.data.includes(searchString))) {
-          core.error(`Target ${url} did not contain the desired string "${searchString}".`)
-          passing = false
-        }
-
-        core.info(`Target ${url} did contain the desired string "${searchString}".`)
+    if (passing && searchString) {
+      if (!(typeof response.data === 'string' && response.data.includes(searchString))) {
+        core.error(`Target ${url} did not contain the desired string "${searchString}".`)
+        passing = false
       }
 
-      if (passing && searchNotString) {
-        if (response.data.includes(searchNotString)) {
-          core.error(`Target ${url} did contain the undesired string "${searchNotString}".`)
-          passing = false
-        }
+      core.info(`Target ${url} did contain the desired string "${searchString}".`)
+    }
 
-        core.info(`Target ${url} did not contain the undesired string "${searchNotString}".`)
+    if (passing && searchNotString) {
+      if (response.data.includes(searchNotString)) {
+        core.error(`Target ${url} did contain the undesired string "${searchNotString}".`)
+        passing = false
       }
 
-      if (passing) {
-        core.info(
-          `Succeeded after ${retryCount + 1} tries (${retryCount} retries), waited ${cumulativeDelay}ms in total.`
-        )
-        return true
-      }
-    } else {
-      core.error(`Target ${url} returned a non-200 status code: ${response.status}`)
+      core.info(`Target ${url} did not contain the undesired string "${searchNotString}".`)
+    }
+
+    if (passing && hasCORSHeader) {
+      // check CORS
+      core.error(`Target ${url} does not have CORS enabled.`)
+      passing = false
+    }
+
+    if (passing) {
+      core.info(
+        `Succeeded after ${retryCount + 1} tries (${retryCount} retries), waited ${cumulativeDelay}ms in total.`
+      )
+      return true
     }
 
     if (retryCount < retries) {
