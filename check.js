@@ -36,7 +36,7 @@ export async function checkURLWithRetry(
 
   async function makeRequest() {
     const response = await axios({
-      method: requestMethod,
+      method: requestMethod ?? 'GET',
       url,
       ...config
     })

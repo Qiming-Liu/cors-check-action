@@ -35319,7 +35319,7 @@ async function checkURLWithRetry(
 
   async function makeRequest() {
     const response = await lib_axios({
-      method: requestMethod,
+      method: requestMethod ?? 'GET',
       url,
       ...config
     })
@@ -35394,7 +35394,7 @@ const requestMethod = core.getInput('method')
 const expectFailure = core.getBooleanInput('expect-failure')
 const maxAttemptsString = core.getInput('max-attempts')
 const retryDelayString = core.getInput('retry-delay')
-const followRedirect = core.getBooleanInput('follow-redirect')
+const followRedirect = core.getBooleanInput('follow-redirect') ?? true
 const cookie = core.getInput('cookie')
 const basicAuthString = core.getInput('basic-auth')
 const searchString = core.getInput('contains')
