@@ -24,7 +24,7 @@ inputs:
   follow-redirect:
     description: Follow redirected location in case request resulted in 3XX status code
     required: false
-    default: 'false'
+    default: 'true'
   cookie:
     description: |
       String representation of cookie attached to health check request.

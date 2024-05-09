@@ -16,7 +16,7 @@ export async function checkURLWithRetry(
   let retryCount = 0
   let cumulativeDelay = 0
   let config = {
-    maxRedirects: followRedirect ? 30 : 0, // set a max to avoid infinite redirects, but that's arbitrary. todo make this an option.
+    maxRedirects: followRedirect ? 30 : 0, // set a max to avoid infinite redirects, but that's arbitrary.
     headers: {},
     // Never throw on failure. Keep retrying as long as we still have retries left.
     validateStatus: () => true,
@@ -36,7 +36,7 @@ export async function checkURLWithRetry(
 
   async function makeRequest() {
     const response = await axios({
-      method: requestMethod ?? 'GET',
+      method: requestMethod,
       url,
       ...config
     })
