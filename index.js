@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import duration from 'duration-js'
-import { checkURLWithRetry } from './curl'
+import { checkURLWithRetry } from './check.js'
 
 process.on('unhandledRejection', (reason) => {
   if (reason instanceof Error) {
@@ -12,17 +12,17 @@ process.on('unhandledRejection', (reason) => {
 })
 
 // Mostly intended to test the action. When true, this reports success as failure and vice versa.
-const expectFailure = core.getBooleanInput('expect-failure')
 const urlString = core.getInput('url', { required: true })
+const requestMethod = core.getInput('method')
+const expectFailure = core.getBooleanInput('expect-failure')
 const maxAttemptsString = core.getInput('max-attempts')
 const retryDelayString = core.getInput('retry-delay')
 const followRedirect = core.getBooleanInput('follow-redirect')
-const useExponentialBackoff = core.getBooleanInput('exponential-backoff')
-const retryAll = core.getBooleanInput('retry-all')
 const cookie = core.getInput('cookie')
 const basicAuthString = core.getInput('basic-auth')
 const searchString = core.getInput('contains')
 const searchNotString = core.getInput('contains-not')
+const useExponentialBackoff = core.getBooleanInput('exponential-backoff')
 
 async function run() {
   const urls = urlString.split('|')
@@ -34,20 +34,20 @@ async function run() {
     // wait for all of them anyway
     await checkURLWithRetry(
       url,
-      searchString,
-      searchNotString,
+      requestMethod,
       maxAttempts,
       retryDelayMs,
-      basicAuthString,
       followRedirect,
-      retryAll,
       cookie,
+      basicAuthString,
+      searchString,
+      searchNotString,
       useExponentialBackoff
     )
   }
 
   // If we reach this without running into an error
-  core.info('All URL checks succeeded.')
+  core.info('All URL CORS checks succeeded.')
 }
 
 run().catch((e) => {

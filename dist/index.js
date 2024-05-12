@@ -30618,7 +30618,7 @@ __nccwpck_require__.d(common_utils_namespaceObject, {
 });
 
 // EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
-var core = __nccwpck_require__(2186);
+var lib_core = __nccwpck_require__(2186);
 // EXTERNAL MODULE: ./node_modules/duration-js/duration.js
 var duration = __nccwpck_require__(4443);
 var duration_default = /*#__PURE__*/__nccwpck_require__.n(duration);
@@ -35280,26 +35280,28 @@ axios.default = axios;
 // this module should only have a default export
 /* harmony default export */ const lib_axios = (axios);
 
-;// CONCATENATED MODULE: ./curl.js
+;// CONCATENATED MODULE: ./check.js
 
 
 
 async function checkURLWithRetry(
   url,
-  searchString,
-  searchNotString,
+  requestMethod,
   retries,
   retryDelay,
-  basicAuthString,
   followRedirect,
-  retryAll,
   cookie,
-  useExponentialBackoff
+  basicAuthString,
+  searchString,
+  searchNotString,
+  useExponentialBackoff,
+  debug
 ) {
+  const core = debug ? console : lib_core
   let retryCount = 0
   let cumulativeDelay = 0
   let config = {
-    maxRedirects: followRedirect ? 30 : 0, // set a max to avoid infinite redirects, but that's arbitrary. todo make this an option.
+    maxRedirects: followRedirect ? 30 : 0, // set a max to avoid infinite redirects, but that's arbitrary.
     headers: {},
     // Never throw on failure. Keep retrying as long as we still have retries left.
     validateStatus: () => true,
@@ -35318,38 +35320,54 @@ async function checkURLWithRetry(
   }
 
   async function makeRequest() {
-    const response = await lib_axios.get(url, config)
-    let passing = true
+    try {
+      const response = await lib_axios({
+        method: requestMethod,
+        url,
+        ...config
+      })
 
-    if (response.status === 200) {
-      core.info(`Target ${url} returned a success status code.`)
+      console.log(response)
+      if (response?.status?.toString()?.match(/^[245]\d{2}$/)) {
+        let passing = true
+        const hasCORSHeader = response.headers?.['access-control-allow-origin'] === '*'
 
-      if (passing && searchString) {
-        if (!(typeof response.data === 'string' && response.data.includes(searchString))) {
-          core.error(`Target ${url} did not contain the desired string "${searchString}".`)
+        // status code
+        core.info(`Target ${url} returned a status code: ${response.status}.`)
+
+        if (passing && searchString) {
+          if (!(typeof response.data === 'string' && response.data.includes(searchString))) {
+            core.error(`Target ${url} did not contain the desired string "${searchString}".`)
+            passing = false
+          }
+
+          core.info(`Target ${url} did contain the desired string "${searchString}".`)
+        }
+
+        if (passing && searchNotString) {
+          if (response.data.includes(searchNotString)) {
+            core.error(`Target ${url} did contain the undesired string "${searchNotString}".`)
+            passing = false
+          }
+
+          core.info(`Target ${url} did not contain the undesired string "${searchNotString}".`)
+        }
+
+        if (passing && !hasCORSHeader) {
+          // check CORS
+          core.error(`Target ${url} does not have CORS enabled.`)
           passing = false
         }
 
-        core.info(`Target ${url} did contain the desired string "${searchString}".`)
-      }
-
-      if (passing && searchNotString) {
-        if (response.data.includes(searchNotString)) {
-          core.error(`Target ${url} did contain the undesired string "${searchNotString}".`)
-          passing = false
+        if (passing) {
+          core.info(
+            `Target ${url} has CORS enabled after ${retryCount + 1} tries (${retryCount} retries), waited ${cumulativeDelay}ms in total.`
+          )
+          return true
         }
-
-        core.info(`Target ${url} did not contain the undesired string "${searchNotString}".`)
       }
-
-      if (passing) {
-        core.info(
-          `Succeeded after ${retryCount + 1} tries (${retryCount} retries), waited ${cumulativeDelay}ms in total.`
-        )
-        return true
-      }
-    } else {
-      core.error(`Target ${url} returned a non-200 status code: ${response.status}`)
+    } catch (err) {
+      core.info(err)
     }
 
     if (retryCount < retries) {
@@ -35374,25 +35392,27 @@ async function checkURLWithRetry(
 
 process.on('unhandledRejection', (reason) => {
   if (reason instanceof Error) {
-    core.error(reason.stack) // Because GitHub won't print it otherwise
-    core.setFailed(reason)
+    lib_core.error(reason.stack) // Because GitHub won't print it otherwise
+    lib_core.setFailed(reason)
   } else {
-    core.setFailed(`${reason}`)
+    lib_core.setFailed(`${reason}`)
   }
 })
 
-async function run() {
-  const urlString = core.getInput('url', { required: true })
-  const maxAttemptsString = core.getInput('max-attempts')
-  const retryDelayString = core.getInput('retry-delay')
-  const followRedirect = core.getBooleanInput('follow-redirect')
-  const useExponentialBackoff = core.getBooleanInput('exponential-backoff')
-  const retryAll = core.getBooleanInput('retry-all')
-  const cookie = core.getInput('cookie')
-  const basicAuthString = core.getInput('basic-auth')
-  const searchString = core.getInput('contains')
-  const searchNotString = core.getInput('contains-not')
+// Mostly intended to test the action. When true, this reports success as failure and vice versa.
+const urlString = lib_core.getInput('url', { required: true })
+const requestMethod = lib_core.getInput('method')
+const expectFailure = lib_core.getBooleanInput('expect-failure')
+const maxAttemptsString = lib_core.getInput('max-attempts')
+const retryDelayString = lib_core.getInput('retry-delay')
+const followRedirect = lib_core.getBooleanInput('follow-redirect')
+const cookie = lib_core.getInput('cookie')
+const basicAuthString = lib_core.getInput('basic-auth')
+const searchString = lib_core.getInput('contains')
+const searchNotString = lib_core.getInput('contains-not')
+const useExponentialBackoff = lib_core.getBooleanInput('exponential-backoff')
 
+async function run() {
   const urls = urlString.split('|')
   const retryDelayMs = duration_default().parse(retryDelayString).milliseconds()
   const maxAttempts = parseInt(maxAttemptsString) - 1
@@ -35402,30 +35422,27 @@ async function run() {
     // wait for all of them anyway
     await checkURLWithRetry(
       url,
-      searchString,
-      searchNotString,
+      requestMethod,
       maxAttempts,
       retryDelayMs,
-      basicAuthString,
       followRedirect,
-      retryAll,
       cookie,
+      basicAuthString,
+      searchString,
+      searchNotString,
       useExponentialBackoff
     )
   }
 
   // If we reach this without running into an error
-  core.info('All URL checks succeeded.')
+  lib_core.info('All URL CORS checks succeeded.')
 }
 
 run().catch((e) => {
-  // Mostly intended to test the action. When true, this reports success as failure and vice versa.
-  let expectFailure = core.getBooleanInput('expect-failure')
-
   if (expectFailure) {
-    core.info('The check failed as expected.')
+    lib_core.info('The check failed as expected.')
   } else {
-    core.setFailed(e)
+    lib_core.setFailed(e)
   }
 })
 

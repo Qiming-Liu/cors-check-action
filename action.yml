@@ -1,10 +1,18 @@
-name: 'URL Health Check'
-description: 'Ping given URL (with curl) for a post-deploy check. With redirect and retrying capabilities'
-author: 'Roman Nazarenko <me@jtalk.me>, Liza Lukicheva <me@bananamilkshake.me>'
+name: 'CORS Check'
+description: 'Ping given URL (with curl) for a CORS check. With redirect and retrying capabilities'
+author: 'Qiming-Liu'
 inputs:
   url:
     description: Target URL(s), split by |
     required: true
+  method:
+    description: HTTP method to use
+    required: false
+    default: 'GET'
+  expect-failure:
+    description: Expect the check to fail (e.g. 4XX, 5XX status code)
+    required: false
+    default: 'false'
   max-attempts:
     description: Number of unsuccessful attempts to call URL before giving up
     required: false
@@ -16,17 +24,7 @@ inputs:
   follow-redirect:
     description: Follow redirected location in case request resulted in 3XX status code
     required: false
-    default: 'false'
-  exponential-backoff:
-    description: Retry with exponential backoff (true) or at regular intervals (false).
-    required: false
-    default: 'false'
-  retry-all:
-    description: |
-      Retry all errors, including 4xx (see man curl on --retry-all-errors).
-      This might upgrade curl to the version supporting this flag.
-    required: false
-    default: 'false'
+    default: 'true'
   cookie:
     description: |
       String representation of cookie attached to health check request.
@@ -49,9 +47,13 @@ inputs:
       String that must not be present in the body at the target URL.
     required: false
     default: ''
+  exponential-backoff:
+    description: Retry with exponential backoff (true) or at regular intervals (false).
+    required: false
+    default: 'false'
 branding:
-  icon: check
-  color: purple
+  icon: alert-triangle
+  color: yellow
 runs:
   using: 'node20'
   main: 'dist/index.js'

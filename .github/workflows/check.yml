@@ -9,22 +9,21 @@ on:
       - master
 
 jobs:
-  check-single-no-redirect:
+  check-local-success:
     strategy:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
-          - windows-latest
     runs-on: ${{ matrix.os }}
-    name: Check single, no redirect
     steps:
       - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          url: https://postman-echo.com/status/200
+      - uses: actions/setup-node@v3
+      - name: Test
+        run: |
+          npm install
+          npm run dev
 
-  expect-failure-check-multiple-no-redirect:
+  check-expect-success:
     strategy:
       matrix:
         os:
@@ -32,221 +31,21 @@ jobs:
           - macos-latest
           - windows-latest
     runs-on: ${{ matrix.os }}
-    name: Check multiple, no redirect (expect failure)
     steps:
       - uses: actions/checkout@v4
       - uses: ./
         with:
-          url: https://postman-echo.com/status/200|https://postman-echo.com/status/304
-          # This is expected to fail as one of the URLs returns 304
+          url: https://cypress.io
+
+  check-expect-failure:
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          url: https://www.google.com
           expect-failure: true
-
-  check-single-with-redirect:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    runs-on: ${{ matrix.os }}
-    name: Check single, with redirect
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          # it does not redirect, but the redirect isn't required. just acceptable.
-          url: https://postman-echo.com/status/200
-          follow-redirect: true
-
-  check-single-with-retry:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    runs-on: ${{ matrix.os }}
-    name: Check single, with retry
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          # it will work at first try.
-          url: https://postman-echo.com/status/200
-          max-attempts: 5
-          retry-delay: 2s
-
-  check-single-retry-all:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    runs-on: ${{ matrix.os }}
-    name: Check single, with retry-all
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          # it will work at first try.
-          url: https://postman-echo.com/status/200
-          max-attempts: 5
-          retry-delay: 2s
-          retry-all: true
-
-  check-single-with-basic-auth:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    runs-on: ${{ matrix.os }}
-    name: Check single, with basic auth
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          url: https://postman-echo.com/basic-auth
-          basic-auth: 'postman:password'
-
-  check-single-with-basic-auth-contains:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    runs-on: ${{ matrix.os }}
-    name: Check single, with basic auth, string contains
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          url: https://postman-echo.com/basic-auth
-          basic-auth: 'postman:password'
-          contains: '"authenticated": true'
-
-  expect-failure-check-single-with-basic-auth-wrong-creds:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    runs-on: ${{ matrix.os }}
-    name: Check single, with basic auth, wrong password (expect failure)
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          url: https://postman-echo.com/basic-auth
-          basic-auth: 'wrong:credentials'
-          contains: '"authenticated": true'
-          expect-failure: true
-
-  check-single-contains-no-redirect:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    runs-on: ${{ matrix.os }}
-    name: Check single, no redirect, with contains
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          url: https://postman-echo.com/status/200
-          contains: '"status": 200'
-
-  expect-failure-check-single-not-contains-no-redirect:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    runs-on: ${{ matrix.os }}
-    name: Check single, no redirect, with contains NOT
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          url: https://postman-echo.com/status/200
-          not-contains: '"status": 200'
-          expect-failure: true
-
-  expect-failure-on-500:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    runs-on: ${{ matrix.os }}
-    name: Should fail when a 500 is encountered
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          url: https://postman-echo.com/status/500
-          expect-failure: true
-          max-attempts: 3
-
-  expect-failure-on-400:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    runs-on: ${{ matrix.os }}
-    name: Should fail when a 400 is encountered
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          url: https://postman-echo.com/status/400
-          expect-failure: true
-          max-attempts: 3
-
-  expect-failure-delay:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    runs-on: ${{ matrix.os }}
-    name: Check single, with retry, but fail before the end
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          # it should try twice then fail before it gets a response.
-          url: https://postman-echo.com/delay/10
-          max-attempts: 2
-          retry-delay: 1s
-          expect-failure: true
-
-  success-delay:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-    runs-on: ${{ matrix.os }}
-    name: Check single, with retry, but work after some retries
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          url: https://postman-echo.com/delay/5
-          max-attempts: 2
-          retry-delay: 4s
-
-  # todo: should add tests that actually have redirects to follow
